@@ -30,7 +30,6 @@ from collections import defaultdict
 from errno import ENOENT
 from stat import S_IFDIR, S_IFLNK, S_IFREG
 from sys import argv, exit
-#from time import time
 from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 from ConfigParser import SafeConfigParser
 
@@ -77,16 +76,15 @@ class Memory(LoggingMixIn, Operations):
 			# Initialize the file keys - e.g. UUID for each file for API
 			self.keys[new_file] = \
 							str(policy['policies'][index]['keys'][0]['uuid'])
+			
+			# Log to the API that policy has been downloaded
+			msg = 'Policy being enforced for ' + new_file
+			key = self.keys[new_file]
+			api_log(key, msg)
 		
 		# Clear the policy.json dict to remove those values/secrets from memory
 		policy.clear()
 		print 'init() complete'
-		##print 'self.files is now:'
-		##print pprint.pprint(self.files)
-		##print 'self.policy is now:'
-		##print pprint.pprint(self.policy)
-		##print 'self.access_count is now:'
-		##print pprint.pprint(self.access_count)
 	
 	def chmod(self, path, mode):
 		# chmod is not allowed - clear data and panic if called
@@ -157,6 +155,11 @@ class Memory(LoggingMixIn, Operations):
 			# Violation of policy
 			self.clear_data()
 			panic(self.keys[path])
+		else:
+			# Log to the API that policy has been downloaded
+			msg = 'Access of ' + path + ' allowed by policy'
+			key = self.keys[path]
+			api_log(key, msg)
 		
 		return self.data[path][offset:offset + size]
 	
@@ -265,7 +268,7 @@ def panic(key):
 	"Warn the API that a violation of policy has occured"
 	# Inform the API of the panic condition
 	message = 'Policy violation on ' + socket.gethostname()
-	panic_url = api_url + panic_uri
+	panic_url = api_url + logging_uri
 	# Stupid json.dumps() chokes on utcnow() so doing json manually for now
 	#   no biscuit for json.dumps()
 	panic_data = '{"agent_id": "' + agent_guid + '", '
@@ -281,6 +284,30 @@ def panic(key):
 	
 	if panic.status_code == 200:
 		print 'Panic log sent to API'
+
+def api_log(key, message):
+	"Log data to the API"
+	# Inform the API of the panic condition
+	message += 'on host ' + socket.gethostname()
+	log_url = api_url + logging_uri
+	# Stupid json.dumps() chokes on utcnow() so doing json manually for now
+	#   no biscuit for json.dumps()
+	log_data = '{"agent_id": "' + agent_guid + '", '
+	log_data += '"received_on": "' + str(datetime.datetime.utcnow()) + '", '
+	log_data += '"severity": "INFO", '
+	log_data += '"key_id": "' + key + '", '
+	log_data += '"message": "' + message + '"}'
+	
+	# Send the JSON log to the API
+	headers = {'Content-Type': 'application/json', 
+			   'Accept': 'application/json', 
+			   'Accept-Charset': 'ISO-8859-1,utf8;q=0.7,*;q=0.3', 
+			   'Accept-Encoding': 'gzip,deflate,sdch'}
+	log_call = requests.post(log_url, data=json.dumps(log_data), 
+							 headers=headers)
+	
+	if log_call.status_code == 200:
+		print 'INFO log sent to API'
 
 def pair_data():
 	"Returns the data needed to pair the agent"
@@ -316,7 +343,7 @@ if __name__ == '__main__':
 	config_file = '/etc/cloudkeep/postern.config'
 	agent_version = '0.1'
 	policy_uri = '/api/123/policies/'
-	pair_uri = '/api/123/agents/'
+	logging_uri = '/api/123/agents/'
 	panic_uri = '/api/123/logs/'
 	max_tries = 5
 	retry_wait = 3
