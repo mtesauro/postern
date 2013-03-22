@@ -343,8 +343,8 @@ if __name__ == '__main__':
 	config_file = '/etc/cloudkeep/postern.config'
 	agent_version = '0.1'
 	policy_uri = '/api/123/policies/'
-	logging_uri = '/api/123/agents/'
-	panic_uri = '/api/123/logs/'
+	pair_uri = '/api/123/agents/'
+	logging_uri = '/api/123/logs/'
 	max_tries = 5
 	retry_wait = 3
 	
