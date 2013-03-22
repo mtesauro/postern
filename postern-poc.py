@@ -272,10 +272,12 @@ def panic(key):
 	panic_data += '"received_on": "' + str(datetime.datetime.utcnow()) + '", '
 	panic_data += '"severity": "PANIC", '
 	panic_data += '"key_id": "' + key + '", '
-	panic_data += '"mesage": ' + message + '", '
+	panic_data += '"message": "' + message + '"}'
 	
 	# Send the JSON log to the API
-	panic = requests.post(panic_url, data=json.dumps(panic_data))
+	headers = {'Content-Type': 'application/json', 'Accept': 'application/json', 
+		   'Accept-Charset': 'ISO-8859-1,utf8;q=0.7,*;q=0.3', 'Accept-Encoding': 'gzip,deflate,sdch'}
+	panic = requests.post(panic_url, data=json.dumps(panic_data), headers=headers)
 	
 	if panic.status_code == 200:
 		print 'Panic log sent to API'
@@ -285,8 +287,9 @@ def pair_data():
 	
 	# Pairing requires id_guid, ip_addresses[], hostname, os/version, 
 	# agent-version, tenant-id, tags[]
-	pair_post = '{"id_guid":"' + agent_guid + '"'
+	pair_post = '{"uuid":"' + agent_guid + '"'
 	
+	pair_post += ',"agent_version": "0.1"'
 	# IP addresses
 	pair_post += ',"ip_addresses": [{'
 	for key in netifaces.interfaces():
@@ -296,7 +299,7 @@ def pair_data():
 	
 	# hostname, os, version and tentant ID
 	pair_post += '"hostname": "' + socket.gethostname() + '",'
-	pair_post += '"os": "' + platform.platform() + '",'
+	pair_post += '"os_version": "' + platform.platform() + '",'
 	pair_post += '"tenant_id": "' + tenant_id + '",'
 	
 	# tags from config file
@@ -312,9 +315,9 @@ if __name__ == '__main__':
 	# Set a few variables - some of this should probably be in the config
 	config_file = '/etc/cloudkeep/postern.config'
 	agent_version = '0.1'
-	policy_uri = 'policy.json'
-	pair_uri = 'pair.php'
-	panic_uri = 'pair.php'
+	policy_uri = '/api/123/policies/'
+	pair_uri = '/api/123/agents/'
+	panic_uri = '/api/123/logs/'
 	max_tries = 5
 	retry_wait = 3
 	
@@ -349,9 +352,9 @@ if __name__ == '__main__':
 		(len(parser.get('settings', 'mount_point')) > 0)):
 		mount_point = parser.get('settings', 'mount_point')
 	else:
-		##mount_point = '/etc/keys'
+		mount_point = '/etc/keys'
 		#MAT# For Testing
-		mount_point = '/home/mtesauro/projects/keys'
+		#mount_point = '/home/mtesauro/projects/keys'
 	
 	# Loop while pairing with API (if needed) and also downloading the policy
 	policy = False
